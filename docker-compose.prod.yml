@@ -1,0 +1,18 @@
+# Production: optimized standalone image.
+#   docker compose -f docker-compose.prod.yml up --build -d
+# Requires API_URL (and APP_URL) in .env or the environment.
+services:
+  web:
+    build:
+      context: .
+      target: runner
+    image: ${IMAGE_NAME:-base-frontend}:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      API_URL: ${API_URL:?Set API_URL to your backend URL}
+      APP_URL: ${APP_URL:?Set APP_URL to the public URL of this app}

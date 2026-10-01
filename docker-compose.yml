@@ -1,0 +1,28 @@
+# Development: hot-reloading Next.js + mock auth API.
+#   docker compose up --build
+# Using your real backend instead of the mock? Set DOCKER_API_URL in .env and run:
+#   docker compose up web
+services:
+  web:
+    build:
+      context: .
+      target: dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      API_URL: ${DOCKER_API_URL:-http://api:4000}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+    volumes:
+      - .:/app
+      - /app/node_modules # keep the container's Linux node_modules
+      - /app/.next
+    depends_on:
+      - api
+
+  api:
+    build: ./mock-api
+    ports:
+      - "4000:4000"
