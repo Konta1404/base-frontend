@@ -1,8 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
   ACCESS_COOKIE,
-  AFTER_LOGIN_PATH,
-  AUTH_ROUTES,
   LOGIN_PATH,
   PROTECTED_ROUTES,
   REFRESH_COOKIE,
@@ -40,8 +38,7 @@ export async function proxy(req: NextRequest) {
     const url = new URL(LOGIN_PATH, req.url);
     url.searchParams.set("next", pathname + search);
     res = NextResponse.redirect(url);
-  } else if (access && matches(AUTH_ROUTES)) {
-    res = NextResponse.redirect(new URL(AFTER_LOGIN_PATH, req.url));
+
   } else {
     res = NextResponse.next({ request: { headers: req.headers } });
   }

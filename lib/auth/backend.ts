@@ -1,7 +1,8 @@
 import "server-only";
 import { env } from "@/lib/env";
 import { AUTH_ENDPOINTS } from "./constants";
-import type { AuthResponse, User } from "./types";
+import { AuthResponseSchema, UserSchema } from "./schemas";
+import type { z } from "zod";
 
 export class BackendError extends Error {
   constructor(
@@ -20,6 +21,7 @@ async function call<T>(path: string, init: RequestInit & { token?: string } = {}
     res = await fetch(`${env.apiUrl}${path}`, {
       ...rest,
       cache: "no-store",
+      signal: AbortSignal.timeout(10000),
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
@@ -52,19 +54,25 @@ function safeJson(text: string) {
   }
 }
 
+async function validated<T>(schema: z.ZodType<T>, path: string, init?: RequestInit & { token?: string }): Promise<T> {
+  const result = schema.safeParse(await call<unknown>(path, init));
+  if (!result.success) throw new BackendError(502, "Authentication service returned an invalid response.");
+  return result.data;
+}
+
 export const authApi = {
   login: (email: string, password: string) =>
-    call<AuthResponse>(AUTH_ENDPOINTS.login, {
+    validated(AuthResponseSchema, AUTH_ENDPOINTS.login, {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
   register: (name: string, email: string, password: string) =>
-    call<AuthResponse>(AUTH_ENDPOINTS.register, {
+    validated(AuthResponseSchema, AUTH_ENDPOINTS.register, {
       method: "POST",
       body: JSON.stringify({ name, email, password }),
     }),
   google: (idToken: string) =>
-    call<AuthResponse>(AUTH_ENDPOINTS.google, {
+    validated(AuthResponseSchema, AUTH_ENDPOINTS.google, {
       method: "POST",
       body: JSON.stringify({ idToken }),
     }),
@@ -74,5 +82,5 @@ export const authApi = {
       token,
       body: JSON.stringify({ refreshToken }),
     }),
-  me: (token: string) => call<User>(AUTH_ENDPOINTS.me, { token }),
+  me: (token: string) => validated(UserSchema, AUTH_ENDPOINTS.me, { token }),
 };

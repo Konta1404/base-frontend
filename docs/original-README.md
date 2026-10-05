@@ -125,13 +125,3 @@ mock-api/                     dev-only mock backend
 ## License
 
 [MIT](LICENSE)
-
-## Verification and limitations
-
-Run `npm test`, `npm run typecheck`, and `npm run lint`. `npm run build -- --webpack` is an alternative when the local environment cannot run Turbopack workers. The CI workflow runs tests, lint, types, and a production build.
-
-Regression tests cover unsafe redirects, short token lifetimes, malformed refresh responses, revoked-cookie login navigation, origin checks, anonymous API calls, and upstream errors. Upstream auth responses are validated with Zod. Requests have a bounded timeout. The generic passthrough rejects `/auth` paths so token endpoints cannot be exposed through client fetches; mutations require the configured application's Origin.
-
-Login remains reachable even when an invalid access cookie is present. Cookie presence alone cannot prove a valid session. The backend must authorize resource access, validate Google tokens, and implement secure refresh rotation. Concurrent refresh requests across multiple application instances still need an upstream rotation/grace strategy; there is no distributed refresh lock here. Never use the in-memory mock as a production auth service.
-
-This is an authentication starter, not a full product. The repository name is retained to avoid breaking links. Screenshots, a hosted demo, manual accessibility review, and a real-provider OAuth end-to-end run remain separate verification steps.

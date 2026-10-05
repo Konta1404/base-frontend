@@ -10,6 +10,7 @@ import {
   REFRESH_COOKIE,
 } from "./constants";
 import type { AuthResponse } from "./types";
+import { AuthResponseSchema } from "./schemas";
 
 type CookieOptions = {
   httpOnly: boolean;
@@ -40,7 +41,7 @@ export function tokenCookies(auth: AuthResponse): TokenCookie[] {
     {
       name: ACCESS_COOKIE,
       value: auth.accessToken,
-      options: opts(Math.max(30, (auth.expiresIn ?? DEFAULT_ACCESS_TTL) - 30)),
+      options: opts(Math.max(1, Math.floor((auth.expiresIn ?? DEFAULT_ACCESS_TTL) * 0.9))),
     },
   ];
   if (auth.refreshToken) {
@@ -66,10 +67,11 @@ export async function refreshTokens(refreshToken: string): Promise<AuthResponse 
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ refreshToken }),
       cache: "no-store",
+      signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as AuthResponse;
-    return data?.accessToken ? data : null;
+    const result = AuthResponseSchema.safeParse(await res.json());
+    return result.success ? result.data : null;
   } catch (err) {
     console.error("[auth] token refresh failed", err);
     return null;

@@ -28,7 +28,7 @@ export const AUTH_ENDPOINTS = {
 
 /** Only allow same-origin relative redirects (prevents open redirects). */
 export function safeRedirect(path: string | null | undefined, fallback = AFTER_LOGIN_PATH) {
-  if (!path || !path.startsWith("/") || path.startsWith("//") || path.startsWith("/\\")) {
+  if (!path || !path.startsWith("/") || path.startsWith("//") || /[\\\x00-\x20]/.test(path)) {
     return fallback;
   }
   return path;

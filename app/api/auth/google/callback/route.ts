@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
         grant_type: "authorization_code",
       }),
       cache: "no-store",
+      signal: AbortSignal.timeout(10000),
     });
     if (!tokenRes.ok) {
       console.error("[auth] google token exchange failed", await tokenRes.text());

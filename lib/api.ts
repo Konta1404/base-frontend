@@ -18,6 +18,7 @@ export async function api<T = unknown>(
   const { json, headers, ...rest } = init;
   const res = await fetch(`${env.apiUrl}${path.startsWith("/") ? path : `/${path}`}`, {
     cache: "no-store",
+    signal: AbortSignal.timeout(10000),
     ...rest,
     body: json !== undefined ? JSON.stringify(json) : rest.body,
     headers: {

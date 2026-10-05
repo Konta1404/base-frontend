@@ -1,44 +1,44 @@
-import type { NextRequest } from "next/server";
-import { env } from "@/lib/env";
-import { getTokens } from "@/lib/auth/session";
+import type { NextRequest } from 'next/server';
+import { env } from '@/lib/env';
+import { getTokens } from '@/lib/auth/session';
 
-/**
- * Backend-for-frontend passthrough for Client Components:
- *   fetch("/api/backend/projects")  ->  ${API_URL}/projects  (+ Bearer token)
- * Tokens never reach the browser; the httpOnly cookie is swapped for a header here.
- */
-async function handler(req: NextRequest, ctx: RouteContext<"/api/backend/[...path]">) {
+// Upstream must independently authorize every resource operation.
+async function handler(req: NextRequest, ctx: RouteContext<'/api/backend/[...path]'>) {
   const { path } = await ctx.params;
+  // Authentication endpoints must use the dedicated server-side auth handlers:
+  // forwarding them could return tokens in a JavaScript-readable response body.
+  if (!path.length || path[0] === 'auth' || path.some(p => p === '.' || p === '..' || /[\\/]/.test(p))) {
+    return Response.json({ message: 'Unsupported backend path.' }, { status: 400 });
+  }
+  const mutation = !['GET', 'HEAD'].includes(req.method);
+  if (mutation && req.headers.get('origin') !== new URL(env.appUrl).origin) {
+    return Response.json({ message: 'Invalid request origin.' }, { status: 403 });
+  }
   const { accessToken } = await getTokens();
-  const target = `${env.apiUrl}/${path.map(encodeURIComponent).join("/")}${req.nextUrl.search}`;
-
-  const headers = new Headers();
-  for (const name of ["content-type", "accept", "accept-language"]) {
+  if (!accessToken) return Response.json({ message: 'Sign in required.' }, { status: 401 });
+  const target = `${env.apiUrl}/${path.map(encodeURIComponent).join('/')}${req.nextUrl.search}`;
+  const headers = new Headers({ authorization: `Bearer ${accessToken}` });
+  for (const name of ['content-type', 'accept', 'accept-language']) {
     const value = req.headers.get(name);
     if (value) headers.set(name, value);
   }
-  if (accessToken) headers.set("authorization", `Bearer ${accessToken}`);
-
-  const hasBody = !["GET", "HEAD"].includes(req.method);
-  const upstream = await fetch(target, {
-    method: req.method,
-    headers,
-    body: hasBody ? await req.arrayBuffer() : undefined,
-    cache: "no-store",
-    redirect: "manual",
-  });
-
-  const resHeaders = new Headers(upstream.headers);
-  for (const h of [
-    "set-cookie",
-    "content-encoding",
-    "content-length",
-    "transfer-encoding",
-    "connection",
-  ]) {
-    resHeaders.delete(h);
+  try {
+    const upstream = await fetch(target, {
+      method: req.method, headers,
+      body: mutation ? await req.arrayBuffer() : undefined,
+      cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(10000),
+    });
+    if (upstream.status >= 300 && upstream.status < 400) {
+      return Response.json({ message: 'Unexpected upstream redirect.' }, { status: 502 });
+    }
+    const responseHeaders = new Headers({ 'Cache-Control': 'no-store' });
+    for (const name of ['content-type', 'content-disposition']) {
+      const value = upstream.headers.get(name);
+      if (value) responseHeaders.set(name, value);
+    }
+    return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
+  } catch {
+    return Response.json({ message: 'Backend unavailable. Please retry.' }, { status: 502 });
   }
-  return new Response(upstream.body, { status: upstream.status, headers: resHeaders });
 }
-
 export { handler as GET, handler as POST, handler as PUT, handler as PATCH, handler as DELETE };
